@@ -10,7 +10,33 @@ output: pdf_document
 ```{r}
 # Import data
 df <- read.csv("/Users/daniel/Dev/STA302-FINAL-PROJECT/Part 1/cleaned_df.csv")
-df <- df[, !names(df) %in% c("X")] # Get rid of the index column
 # Verifies that the data is imported correctly
 str(df)
 ```
+
+Now we will separate the dataset into training set and test set
+
+```{r}
+# Create a 50/50 split
+set.seed(1)
+# Opted for a higher number of samples to include in the training dataset
+train_df <- df[sample(1:nrow(df), ceiling(nrow(df)/2), replace=F), ]
+test_df <- df[which(!(df$X %in% train_df$X)), ]
+
+# Delete the index column that was used to separate the training and testing data sets
+train_df <- train_df[!(names(train_df) %in% c("X"))]
+test_df <- test_df[!(names(test_df) %in% c("X"))]
+
+# Verify the training and testing data sets have the right number of samples
+dim(train_df)
+dim(test_df)
+```
+
+
+
+
+
+
+
+
+
