@@ -1,0 +1,63 @@
+---
+title: "Part 1 Data Cleaning and EDA Code"
+author: "Tong Guan"
+output: pdf_document
+---
+## Setup
+Import the data set and libraries
+```{r}
+library(pastecs)
+
+CPI_data <- read.csv("/Users/daniel/Documents/Academics/Undergraduate/2021-22 Academic Year/Fall Session/STA302H1F/Final Project/Data/Bank of Canada Original Data Modified.csv")
+GSPTSE_data <- read.csv("/Users/daniel/Documents/Academics/Undergraduate/2021-22 Academic Year/Fall Session/STA302H1F/Final Project/Data/^GSPTSE.csv")
+CPI_multi_data <- read.csv("/Users/daniel/Documents/Academics/Undergraduate/2021-22 Academic Year/Fall Session/STA302H1F/Final Project/Data/BOC Multi CPI Original Modified.csv")
+```
+
+## Data Cleaning
+```{r}
+GSPTSE_data$Close <- as.numeric(GSPTSE_data$Close)
+GSPTSE_data$Volume <- as.numeric(GSPTSE_data$Volume)
+CPI_multi_data <- CPI_multi_data[, !names(CPI_multi_data) %in% c("INDINF_LOWTARGET", "INDINF_UPPTARGET")]
+```
+
+```{r}
+# Calculate monthly change (crated just for reference, not used for Part 1 but may be used in the future)
+GSPTSE_data$Monthly_Change <- 0.0
+for (i in 2: nrow(GSPTSE_data)) {
+  if (!is.null(GSPTSE_data[i,]$Close)) {
+    GSPTSE_data[i,]$Monthly_Change <- (GSPTSE_data[i,]$Close/GSPTSE_data[i-1,]$Close-1)
+  }
+}
+```
+
+```{r}
+# Merge data
+merged_df <- merge(CPI_data, GSPTSE_data, by="Date", all=TRUE)
+merged_df <- merge(merged_df, CPI_multi_data, by="Date", all=TRUE)
+# Drop irrelevant columns
+merged_df <- merged_df[, !names(merged_df) %in% c("Open", "High", "Low", "Close", "Adj.Close", "Date", "")]
+# Make complete case
+merged_df <- merged_df[complete.cases(merged_df),]
+```
+
+## Get Summary Statistics
+```{r}
+sum <- round(stat.desc(merged_df), 2)
+write.csv(sum, "test.csv")
+```
+## Plotting Graphs
+```{r, echo=FALSE}
+x_1 <- merged_df$INDINF_CPI_M
+x_2 <- merged_df$INDINF_CPI_COMMON_M
+x_3 <- merged_df$INDINF_CPI_MEDIAN_M
+x_4 <- merged_df$INDINF_CPI_TRIM_M
+y <- merged_df$Monthly_Change
+par(mfrow=c(2,2))
+plot(x_1, y, xlab="Inflation (CPI Inflation)", ylab="Monthly Change In GSPTSE") + abline(lm(y ~ x_1), col="blue")
+plot(x_2, y, xlab="Inflation (CPI-Common Inflation)", ylab="Monthly Change In GSPTSE") + abline(lm(y ~ x_2), col="blue")
+plot(x_3, y, xlab="Inflation (CPI-Median Inflation)", ylab="Monthly Change In GSPTSE") + abline(lm(y ~ x_3), col="blue")
+plot(x_4, y, xlab="Inflation (CPI-Trim Inflation)", ylab="Monthly Change In GSPTSE") + abline(lm(y ~ x_4), col="blue")
+```
+
+
+
