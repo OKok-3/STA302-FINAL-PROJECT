@@ -38,6 +38,9 @@ merged_df <- merge(merged_df, CPI_multi_data, by="Date", all=TRUE)
 merged_df <- merged_df[, !names(merged_df) %in% c("Open", "High", "Low", "Close", "Adj.Close", "Date", "")]
 # Make complete case
 merged_df <- merged_df[complete.cases(merged_df),]
+
+# Store the cleaned dataset to a CSV for use in part 3
+write.csv(merged_df, "cleaned_df.csv")
 ```
 
 ## Get Summary Statistics
