@@ -38,6 +38,13 @@ merged_df <- merge(merged_df, CPI_multi_data, by="Date", all=TRUE)
 merged_df <- merged_df[, !names(merged_df) %in% c("Open", "High", "Low", "Close", "Adj.Close", "Date", "")]
 # Make complete case
 merged_df <- merged_df[complete.cases(merged_df),]
+# Convert percentages to decimal
+merged_df$INDINF_CPI_M <- merged_df$INDINF_CPI_M / 100
+merged_df$INDINF_LOWTARGET <- merged_df$INDINF_LOWTARGET / 100
+merged_df$INDINF_UPPTARGET <- merged_df$INDINF_UPPTARGET / 100
+merged_df$INDINF_CPI_COMMON_M <- merged_df$INDINF_CPI_COMMON_M / 100
+merged_df$INDINF_CPI_MEDIAN_M <- merged_df$INDINF_CPI_MEDIAN_M / 100
+merged_df$INDINF_CPI_TRIM_M <- merged_df$INDINF_CPI_TRIM_M / 100
 
 # Store the cleaned dataset to a CSV for use in part 3
 write.csv(merged_df, "cleaned_df.csv")
