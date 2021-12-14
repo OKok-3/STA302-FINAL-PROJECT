@@ -1,0 +1,24 @@
+---
+output: pdf_document
+---
+
+# Impact of Inflation On Stock Market Performance -- A Canadian Perspective (With Code)
+
+## Setup
+
+```{r}
+# Import data
+df <- read.csv("/Users/daniel/Dev/STA302-FINAL-PROJECT/Part 1/cleaned_df.csv")
+```
+
+## EDA
+```{r}
+for (i in 1:length(df)) {
+  hist(df[,i], main=names(df)[i])
+}
+```
+
+## Modelling
+```{r}
+mod1 <- lm(df$Monthly_Change ~ ., data=df)
+```
