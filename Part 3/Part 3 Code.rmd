@@ -38,7 +38,7 @@ dim(test_df)
 ## Data Modelling On Training Set
 ### EDA
 #### Histograms
-```{r}
+```{r, fig.width=6, fig.height=4}
 par(mfrow=c(2,2))
 for (i in 1:ncol(train_df)) {
   hist(train_df[, i], main=paste("Histogram of", names(train_df)[i]), xlab=names(train_df)[i])
@@ -62,9 +62,17 @@ mod1 <- lm(train_df$Monthly_Change ~ ., data=train_df)
 summary(mod1)
 ```
 
+### Checking Residual Plot Additional Condition 1 and 2
+```{r, fig.width=6, fig.height=4}
+# Check condition 1
+plot(train_df$Monthly_Change ~ fitted(mod1), main="Y versus Y-hat", xlab="Y-hat", ylab="Y")
+abline(a=0, b=1)
+lines(lowess(train_df$Monthly_Change ~ fitted(mod1)), lty=2)
 
-
-
+# Check condition 2
+pairs(train_df[, c(1:3, 5:length(train_df))], lower.panel=NULL)
+```
+Condition 1 and condition 2 looks good. However, there does exist some strong collinearity in the pairs scatterplot, we will investigate them after we check our residuals and perform any needed transformations.
 
 
 
