@@ -13,7 +13,7 @@ df <- read.csv("/Users/daniel/Dev/STA302-FINAL-PROJECT/Part 1/cleaned_df.csv")
 # Verifies that the data is imported correctly
 str(df)
 ```
-Because inflation target is the midpoint between the lower and upper inflation target, will exclude the upper inflation target to avoid perfect collinearity.
+Because inflation target is the midpoint between the lower and upper inflation target, we will exclude the upper inflation target to avoid perfect collinearity.
 ```{r}
 df <- df[, !(names(df) %in% c("INDINF_UPPTARGET"))]
 ```
@@ -73,6 +73,27 @@ lines(lowess(train_df$Monthly_Change ~ fitted(mod1)), lty=2)
 pairs(train_df[, c(1:3, 5:length(train_df))], lower.panel=NULL)
 ```
 Condition 1 and condition 2 looks good. However, there does exist some strong collinearity in the pairs scatterplot, we will investigate them after we check our residuals and perform any needed transformations.
+
+### Checking Residual Plots
+```{r, fig.height=4, fig.width=6}
+# Get the residuals from our first spec
+r1 <- resid(mod1)
+
+# Plot the residual plots
+par(mfrow=c(2,2))
+# Residual plot for the fitted values
+plot(r1 ~ fitted(mod1), xlab="Fitted Values", ylab="Residual")
+abline(a = 0,b = 0)  # Add an abline as a reference of the line y=0
+# Plot the residual plots for the predictors
+for (i in c(1:3, 5:length(train_df))) {
+  plot(r1 ~ train_df[, i], xlab=colnames(train_df)[i], ylab="Residual")
+  abline(a = 0,b = 0)  # Add an abline as a reference of the line y=0
+}
+
+# Plot the normal QQ plot
+qqnorm(r1)
+qqline(r1)
+```
 
 
 
