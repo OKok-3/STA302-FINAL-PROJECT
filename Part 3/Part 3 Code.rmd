@@ -1,104 +1,163 @@
 ---
 output: pdf_document
 ---
-
 # Impact of Inflation On Stock Market Performance -- A Canadian Perspective (With Code)
 **Although this is not the full analysis for part 3, you may find the notes in this document helpful as supplements to the full analysis.**
 
 ## Setup
-
 ```{r}
-# Import data
-df <- read.csv("/Users/daniel/Dev/STA302-FINAL-PROJECT/Part 1/cleaned_df.csv")
-# Verifies that the data is imported correctly
+# Import Data
+df <- read.csv("Combined Dataset with GDP.csv")
+# Check if values are imported correctly
 str(df)
 ```
-Because inflation target is the midpoint between the lower and upper inflation target, we will exclude the upper inflation target to avoid perfect collinearity.
-```{r}
-df <- df[, !(names(df) %in% c("INDINF_UPPTARGET"))]
-```
-Now we will separate the dataset into training set and test set
 
+
+We can see that there are some NaN values in the dataset, and the percentage values are not in decimal. Because we need access to the first column of "Close" to compute for Monthly Changes in the stock market, we can't delete the NaN values yet, but we can convert the percentage values into decimal.
+
+Additionally, because the Bank of Canada's inflation target upper and lower band didn't change for the period we selected (run the code below to see the graphs), we will remove them as predictors.
+```{r}
+# par(mfrow=c(1,2))
+# hist(df$Inflation_Upper_Band)
+# hist(df$Inflation_Lower_Band)
+```
+
+### Data Cleaning
+```{r}
+# Remove Inflation_Upper_ and Lower_Band
+df <- df[, !(names(df) %in% c("Inflation_Upper_Band", "Inflation_Lower_Band"))]
+# Percentage values are not in decimal form, we will transform them
+df$Inflation_by_CPI <- df$Inflation_by_CPI / 100
+df$CPI_Common <- df$CPI_Common / 100
+df$CPI_Median <- df$CPI_Median / 100
+df$CPI_Trim <- df$CPI_Trim / 100
+
+# Make dataset complete case
+df <- df[complete.cases(df), ]
+```
+
+## Model Fitting
+First we will separate the dataset into two -- training set and testing set.
 ```{r}
 # Create a 50/50 split
 set.seed(1)
+
 # Opted for a higher number of samples to include in the training dataset
-train_df <- df[sample(1:nrow(df), ceiling(nrow(df)/2), replace=F), ]
-test_df <- df[which(!(df$X %in% train_df$X)), ]
+train_df <- df[sample(1:nrow(df), ceiling(nrow(df)/2), replace=FALSE), ]
+test_df <- df[which(!(df$Date %in% train_df$Date)), ]
 
-# Delete the index column that was used to separate the training and testing data sets
-train_df <- train_df[!(names(train_df) %in% c("X"))]
-test_df <- test_df[!(names(test_df) %in% c("X"))]
+# Delete the Date columnn because we don't need it anymore
+train_df <- train_df[, !(names(train_df) %in% c("Date"))]
+test_df <- test_df[, !(names(test_df) %in% c("Date"))]
 
-# Verify the training and testing data sets have the right number of samples
+# Confirm the dimensions of the datasets
 dim(train_df)
 dim(test_df)
 ```
 
-## Data Modelling On Training Set
-### EDA
-#### Histograms
-```{r, fig.width=6, fig.height=4}
+### EDA On Training Set
+```{r, fig.width=7, fig.height=5.5}
+# Plot Histograms
 par(mfrow=c(2,2))
-for (i in 1:ncol(train_df)) {
-  hist(train_df[, i], main=paste("Histogram of", names(train_df)[i]), xlab=names(train_df)[i])
+for (i in 1:length(train_df)) {
+  hist(
+    train_df[,i],
+    main=paste("Histogram of", gsub("_", " ", names(train_df)[i])),
+    xlab=gsub("_", " ", names(train_df)[i])
+    )
 }
 ```
-From the above histograms, we can see that most variables look relatively normal. However, for lower and upper targets, the histogram looks substantially skewed. We need to watch out for its implications in our analysis. 
 
-#### Scatterplots
-```{r, fig.width=6, fig.height=4}
+There does appear some skews in the histograms of CPI Common and Real GDP. We will need to watch out for this in our analysis.
+
+```{r, fig.width=7, fig.height=5.5}
+# Plot scatterplots against Close
 par(mfrow=c(2,2))
-for (i in c(1:3, 5:length(train_df))) {
-  plot(train_df[,i], train_df$Monthly_Change, main=paste(names(train_df)[4], "vs", names(train_df)[i]), xlab=names(train_df)[i], ylab=names(train_df)[5])
+for (i in 2:(length(train_df))) {
+  plot(
+    train_df[,i],
+    train_df$Close,
+    main=paste(gsub("_", " ", names(train_df)[i]), "vs", "Close"),
+    xlab=gsub("_", " ", names(train_df)[i]),
+    ylab="Close"
+    )
 }
 ```
-We can see that there are some points of concern appearing in the scatterplots, we will investigate them further later on
 
-## Model Fitting
-We will start with all available predictors
+Scatterplots look good too.
+
+### Specification 1 On Training Dataset
 ```{r}
-mod1 <- lm(train_df$Monthly_Change ~ ., data=train_df)
-summary(mod1)
+s1 <- lm(train_df$Close ~ ., data=train_df)
+summary(s1)
 ```
 
-### Checking Residual Plot Additional Condition 1 and 2
-```{r, fig.width=6, fig.height=4}
-# Check condition 1
-plot(train_df$Monthly_Change ~ fitted(mod1), main="Y versus Y-hat", xlab="Y-hat", ylab="Y")
+#### Checking Conditions 1 and 2
+```{r, fig.height=5.5, fig.width=7}
+# Condition 1
+plot(train_df$Close ~ fitted(s1), main="Y versus Y-hat", xlab="Y-hat", ylab="Y")
 abline(a=0, b=1)
-lines(lowess(train_df$Monthly_Change ~ fitted(mod1)), lty=2)
+lines(lowess(train_df$Close ~ fitted(s1)), lty=2)
 
-# Check condition 2
-pairs(train_df[, c(1:3, 5:length(train_df))], lower.panel=NULL)
+# Condition 2
+pairs(train_df[, c(2:length(train_df))], lower.panel=NULL)
 ```
-Condition 1 and condition 2 looks good. However, there does exist some strong collinearity in the pairs scatterplot, we will investigate them after we check our residuals and perform any needed transformations.
 
-### Checking Residual Plots
-```{r, fig.height=4, fig.width=6}
-# Get the residuals from our first spec
-r1 <- resid(mod1)
+Condition 1 looks amazing. Condition 2 also appear to be okay. We will continue to look at the residual plots.
+
+#### Residual Plots
+```{r, fig.height=5.5, fig.width=7}
+# Get the residuals from spec 1
+r1 <- resid(s1)
 
 # Plot the residual plots
 par(mfrow=c(2,2))
 # Residual plot for the fitted values
-plot(r1 ~ fitted(mod1), xlab="Fitted Values", ylab="Residual")
-abline(a = 0,b = 0)  # Add an abline as a reference of the line y=0
-# Plot the residual plots for the predictors
-for (i in c(1:3, 5:length(train_df))) {
-  plot(r1 ~ train_df[, i], xlab=colnames(train_df)[i], ylab="Residual")
-  abline(a = 0,b = 0)  # Add an abline as a reference of the line y=0
+plot(r1 ~ fitted(s1), xlab="Fitted Values", ylab="Residual")
+abline(a = 0, b = 0)
+# Residual plots for the predictors
+for (i in 2:(length(train_df))) {
+  plot(r1 ~ train_df[, i], xlab=gsub("_", " ", colnames(train_df)[i]), ylab="Residual")
+  abline(a = 0, b = 0)
 }
 
-# Plot the normal QQ plot
+# Plot the qq plots
 qqnorm(r1)
 qqline(r1)
 ```
 
+There are some fanning out pattern appearing in the residual plots for Inflation by CPI, CPI Trim, CPI Median, and CPI Common. We will apply appropriate transformations to correct for that.
 
+Additionally, the Normal Q-Q Plot also seems to be heavy-tailed, we will also need to correct for this as well
 
+## Model Violations Correction
+```{r}
+# Box-Cox Transformation
+library(car)
 
+p <- powerTransform(cbind(
+  train_df[, 1],
+  train_df[, 2],
+  train_df[, 3],
+  train_df[, 4],
+  train_df[, 5],
+  train_df[, 6],
+  train_df[, 7]
+) ~ 1, family="bcnPower")
+summary(p)
+```
 
+```{r}
+# Apply transformations
+transformed_train_df <- cbind(train_df)  # get a copy of the training set
+transformed_train_df[, 1] <- transformed_train_df[, 1] * 1
+transformed_train_df[, 2] <- log(transformed_train_df[, 2])
+transformed_train_df[, 3] <- transformed_train_df[, 3] * 1
+transformed_train_df[, 4] <- log(transformed_train_df[, 4])
+transformed_train_df[, 5] <- transformed_train_df[, 5] * 1
+transformed_train_df[, 6] <- transformed_train_df[, 6] * 1
+transformed_train_df[, 7] <- transformed_train_df[, 7] * 1
+```
 
 
 
