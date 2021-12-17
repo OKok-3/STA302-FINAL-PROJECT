@@ -55,6 +55,28 @@ dim(train_df)
 dim(test_df)
 ```
 
+#### Summary Statistics of Training and Testing Set
+```{r}
+meanTrain <- apply(train_df, 2, mean)
+sdTrain <- apply(train_df, 2, sd)
+sdTrain
+
+meanTest <- apply(test_df, 2, mean)
+sdTest <- apply(test_df, 2, sd)
+```
+
+Variable | mean (s.d.) in Training Set | mean (s.d.) in Testing Set
+---------|-----------------------------|---------------------------
+`r names(train_df)[1]` | `r round(meanTrain[1], 2)` (`r round(sdTrain[1], 2)`) | `r round(meanTest[1], 2)` (`r round(sdTest[1], 2)`)
+`r names(train_df)[2]` | `r round(meanTrain[2], 2)` (`r round(sdTrain[2], 2)`) | `r round(meanTest[2], 2)` (`r round(sdTest[2], 2)`)
+`r names(train_df)[3]` | `r round(meanTrain[3], 2)` (`r round(sdTrain[3], 2)`) | `r round(meanTest[3], 2)` (`r round(sdTest[3], 2)`)
+`r names(train_df)[4]` | `r round(meanTrain[4], 2)` (`r round(sdTrain[4], 2)`) | `r round(meanTest[4], 2)` (`r round(sdTest[4], 2)`)
+`r names(train_df)[5]` | `r round(meanTrain[5], 2)` (`r round(sdTrain[5], 2)`) | `r round(meanTest[5], 2)` (`r round(sdTest[5], 2)`)
+`r names(train_df)[6]` | `r round(meanTrain[6], 2)` (`r round(sdTrain[6], 2)`) | `r round(meanTest[6], 2)` (`r round(sdTest[6], 2)`)
+`r names(train_df)[7]` | `r round(meanTrain[7], 2)` (`r round(sdTrain[7], 2)`) | `r round(meanTest[7], 2)` (`r round(sdTest[7], 2)`)
+
+***Inflation data provided by the Bank of Canada looks suspiciously good, hmm***
+
 ### EDA On Training Set
 ```{r, fig.width=7, fig.height=5.5}
 # Plot Histograms
@@ -108,16 +130,16 @@ Condition 1 looks amazing. Condition 2 also appear to be okay. We will continue 
 #### Residual Plots
 ```{r, fig.height=5.5, fig.width=7}
 # Get the residuals from spec 1
-r1 <- resid(s1)
+r1 <- rstandard(s1)
 
 # Plot the residual plots
 par(mfrow=c(2,2))
 # Residual plot for the fitted values
-plot(r1 ~ fitted(s1), xlab="Fitted Values", ylab="Residual")
+plot(r1 ~ fitted(s1), xlab="Fitted Values", ylab="Residual", main="Fitted Values vs Residual")
 abline(a = 0, b = 0)
 # Residual plots for the predictors
 for (i in 2:(length(train_df))) {
-  plot(r1 ~ train_df[, i], xlab=gsub("_", " ", colnames(train_df)[i]), ylab="Residual")
+  plot(r1 ~ train_df[, i], xlab=gsub("_", " ", colnames(train_df)[i]), ylab="Residual", main=paste(gsub("_", " ", colnames(train_df)[i]), "vs Residual"))
   abline(a = 0, b = 0)
 }
 
@@ -130,7 +152,7 @@ There are some fanning out pattern appearing in the residual plots for Inflation
 
 Additionally, the Normal Q-Q Plot also seems to be heavy-tailed, we will also need to correct for this as well
 
-## Model Violations Correction
+### Model Violations Correction
 ```{r}
 # Box-Cox Transformation
 library(car)
@@ -158,6 +180,238 @@ transformed_train_df[, 5] <- transformed_train_df[, 5] * 1
 transformed_train_df[, 6] <- transformed_train_df[, 6] * 1
 transformed_train_df[, 7] <- transformed_train_df[, 7] * 1
 ```
+
+#### Specification 2 On Training Set
+```{r}
+s2 <- lm(transformed_train_df$Close ~ ., data=transformed_train_df)
+summary(s2)
+```
+
+#### Checking Conditions 1 and 2
+```{r, fig.height=5.5, fig.width=7}
+# Condition 1
+plot(transformed_train_df$Close ~ fitted(s2), main="Y versus Y-hat", xlab="Y-hat", ylab="Y")
+abline(a=0, b=1)
+lines(lowess(transformed_train_df$Close ~ fitted(s2)), lty=2)
+
+# Condition 2
+pairs(transformed_train_df[, c(2:length(transformed_train_df))], lower.panel=NULL)
+```
+
+Condition 1 and 2 still looks good. Although for Volume it looks a bit weird, but no violations.
+
+#### Residual Plots
+```{r, fig.height=5.5, fig.width=7}
+# Get the residuals from spec 1
+r2 <- rstandard(s2)
+
+# Plot the residual plots
+par(mfrow=c(2,2))
+# Residual plot for the fitted values
+plot(r2 ~ fitted(s2), xlab="Fitted Values", ylab="Residual")
+abline(a = 0, b = 0)
+# Residual plots for the predictors
+for (i in 2:(length(transformed_train_df))) {
+  plot(r2 ~ transformed_train_df[, i], xlab=gsub("_", " ", colnames(transformed_train_df)[i]), ylab="Residual")
+  abline(a = 0, b = 0)
+}
+
+# Plot the qq plots
+qqnorm(r2)
+qqline(r2)
+```
+
+As we can see from the above residual plots, the Box-Cox transformation did not provide sufficient improvements, if at all, to the fanning out pattern exhibiting in the different measures of inflation. Thus, we will not be transforming our model and continue to use our first specification.
+
+The slight violation of constant error variance may be due to the recent changes in market sentiment, trading technologies, or other factors that made speculating and investing in the financial markets more accessible or preferable. Thus, our model cannot capture the additional variance introduced recently (approximately 2019 and afterwards).
+
+## Model Selection
+Because we have observed that there are slight deviations on either tails in our normal QQ plot, we will raise the cutoff to 0.10 to be more tolerant with our hypothesis tests.
+
+We will first construct a model with the predictors with statistically significant t-test p-values, and perform model diagnostics on it, before we conduct a partial F-test.
+```{r}
+# Construct the reduced model
+reduced_mod <- lm(train_df$Close ~ Volume + CPI_Common + CPI_Median + CPI_Trim + Real_GDP, data=train_df)
+summary(reduced_mod)
+```
+
+Check conditions 1 and 2
+```{r, fig.height=5.5, fig.width=7}
+# Condition 1
+plot(train_df$Close ~ fitted(reduced_mod), main="Y versus Y-hat", xlab="Y-hat", ylab="Y")
+abline(a=0, b=1)
+lines(lowess(train_df$Close ~ fitted(reduced_mod)), lty=2)
+
+# Condition 2
+pairs(train_df[, c(2, 4:7)], lower.panel=NULL)
+```
+
+Plot residual plots and normal QQ plots
+```{r, fig.height=5.5, fig.width=7}
+# Get the residuals from spec 1
+reduced_r <- rstandard(reduced_mod)
+
+# Plot the residual plots
+par(mfrow=c(2,2))
+# Residual plot for the fitted values
+plot(reduced_r ~ fitted(reduced_mod), xlab="Fitted Values", ylab="Residual")
+abline(a = 0, b = 0)
+# Residual plots for the predictors
+for (i in 2:(length(train_df))) {
+  plot(r2 ~ train_df[, i], xlab=gsub("_", " ", colnames(train_df)[i]), ylab="Residual")
+  abline(a = 0, b = 0)
+}
+
+# Plot the qq plots
+qqnorm(reduced_r)
+qqline(reduced_r)
+```
+
+All looks good (excluding slight heteroskedasticity discussed earlier) :)
+
+### Partial F-Test
+```{r}
+anova(reduced_mod, s1)
+```
+With a p-value of 0.9957, we fail to reject the null hypothesis, and conclude that there is no evidence suggesting the full model is better than the reduced model. Therefore, we will use the reduced model from now onward.
+
+### Model 1 -- Manually Eliminating Multicollinearity By VIF
+As we have seen from our pairs scatterplots, there exist some strong linear relationships between a few predictors. We will now compute the VIF to examine them formally, removing the predictors with VIF > 5 because we want to avoid multicollinearity as our goal is to have a clear picture of the relationship of between the response and the predictors.
+```{r}
+vif(reduced_mod)
+```
+
+Because, by the definition provided on the Bank of Canada website, (not quoted here to avoid plagiarism because I won't provide a reference sheet in this code file), we will eliminate CPI_Trim and CPI_Median and see how it goes.
+
+```{r}
+VIF_mod <- lm(train_df$Close ~ Volume + CPI_Common + Real_GDP, data=train_df)
+summary(VIF_mod)
+vif(VIF_mod)
+```
+
+Now, we will check the assumptions for this potential final model
+```{r, fig.height=5.5, fig.width=7}
+# Condition 1
+plot(train_df$Close ~ fitted(VIF_mod), main="Y versus Y-hat", xlab="Y-hat", ylab="Y")
+abline(a=0, b=1)
+lines(lowess(train_df$Close ~ fitted(VIF_mod)), lty=2)
+
+# Condition 2
+pairs(train_df[, c(2, 4, 7)], lower.panel=NULL)
+
+# Get the residuals
+VIF_r <- rstandard(VIF_mod)
+
+# Plot the residual plots
+par(mfrow=c(2,2))
+# Residual plot for the fitted values
+plot(VIF_r ~ fitted(VIF_mod), xlab="Fitted Values", ylab="Residual")
+abline(a = 0, b = 0)
+# Residual plots for the predictors
+for (i in c(2, 4, 7)) {
+  plot(VIF_r ~ train_df[, i], xlab=gsub("_", " ", colnames(train_df)[i]), ylab="Residual")
+  abline(a = 0, b = 0)
+}
+
+# Plot the qq plots
+qqnorm(VIF_r)
+qqline(VIF_r)
+```
+
+All good :)
+
+### Model Subsets
+#### Through Adjusted R-Squared
+```{r}
+library(leaps)
+
+best <- regsubsets(Close ~ ., data=train_df, nbest=1)
+summary(best)
+subsets(best, statistic = "adjr2")
+```
+The adjusted R-Squared suggest that we implement the full model, which we have already determined that it's not ideal. So we will ignore its suggestion.
+
+#### Through AIC
+```{r}
+library(MASS)
+
+# Forward selection
+stepAIC(
+  lm(Close ~ 1, data=train_df),
+  scope = list(upper=lm(Close ~ ., data=train_df)),
+  direction = "forward",
+  k = 2  # We wish to work with AIC
+        )
+```
+
+From the above result, we can see that if we the model we only gain 0.53 if we add CPI_Trim, and another 1.04 if we add CPI_Median, which are not significant improvements compared with adding Real_GDP, CPI_Common, and Volume. Therefore, we will also ignore the forward step wise AIC.
+
+
+```{r}
+# Backward selection based on AIC
+stepAIC(
+  lm(Close ~ ., data=train_df),
+  scope = list(lower=lm(Close ~ 1, data=train_df)),
+  direction = "backward",
+  k = 2  # We wish to work with AIC
+        )
+```
+
+We already knew that CPI_Median and CPI_Trim have high VIF values. Additionally, removing either of them will make the other an insignificant predictor based on the t-test (run below to verify). Therefore, we will also not consider its suggestion and stick with our manual selection.
+```{r}
+#VIF_mod_1 <- lm(Close ~ Volume + CPI_Median + CPI_Common + Real_GDP, data=train_df)
+#VIF_mod_2 <- lm(Close ~ Volume + CPI_Trim + CPI_Common + Real_GDP, data=train_df)
+
+#summary(VIF_mod_1)
+#summary(VIF_mod_2)
+```
+
+#### Through BIC
+```{r}
+# Forward Selection
+stepAIC(
+  lm(Close ~ 1, data=train_df),
+  scope = list(upper=lm(Close ~ ., data=train_df)),
+  direction = "forward",
+  k = log(nrow(train_df))  # We wish to work with BIC
+        )
+```
+
+Here, it agrees with our manual selection :)
+
+```{r}
+# Backward selection based on BIC
+stepAIC(
+  lm(Close ~ ., data=train_df),
+  scope = list(lower=lm(Close ~ 1, data=train_df)),
+  direction = "backward",
+  k = log(nrow(train_df))  # We wish to work with BIC
+        )
+```
+
+Same result as forward :)
+
+#### Stepwise Selection
+```{r}
+# Step wise AIC
+stepAIC(lm(Close ~., data=train_df), direction = "both", k = 2)
+```
+
+Again, the same as forward and backward AIC, we will ignore it here.
+
+```{r}
+# Step wise BIC
+stepAIC(lm(Close ~., data=train_df), direction = "both", k = log(nrow(train_df)))
+```
+
+Same as before :)
+
+Thus, based on our model selection procedures, we find that the model Close ~ Volume + CPI_Common + Real_GDP is the "best" model.
+
+
+
+
+
 
 
 
