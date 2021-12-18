@@ -408,14 +408,213 @@ Same as before :)
 
 Thus, based on our model selection procedures, we find that the model Close ~ Volume + CPI_Common + Real_GDP is the "best" model.
 
+## Model Validation
+```{r}
+final_mod <- lm(Close ~ Volume + CPI_Common + Real_GDP, data=train_df)
+test_mod <- lm(Close ~ Volume + CPI_Common + Real_GDP, data=test_df)
+```
+
+### Multicollinearity
+
+Compare the VIF values
+```{r}
+vif(final_mod)
+vif(test_mod)
+```
+Everything looks good :)
+
+### Leverage/Influential Points and Outliers
+
+Compare outliers, influential/leverage points
+```{r, fig.height=5, fig.width=8}
+# For Training Model
+par(mfrow=c(2,3), oma=c(0,0,3,0))
+# Leverage Points
+l_pts_train <- which(hatvalues(final_mod) > 2 * (length(coef(final_mod))-1 + 1) / nrow(train_df))
+l_pts_test <- which(hatvalues(test_mod) > 2 * (length(coef(test_mod))-1 + 1) / nrow(test_df))
+# Plot in graph
+# Training Set
+plot(train_df$Close ~ train_df$Volume, main="Volume vs Close", xlab="Volume", ylab="Close")
+points(train_df$Close[l_pts_train] ~ train_df$Volume[l_pts_train], col="red", pch=19)
+plot(train_df$Close ~ train_df$CPI_Common, main="CPI Common vs Close", xlab="CPI Common", ylab="Close")
+points(train_df$Close[l_pts_train] ~ train_df$CPI_Common[l_pts_train], col="red", pch=19)
+plot(train_df$Close ~ train_df$Real_GDP, main="Real GDP vs Close", xlab="Real GDP", ylab="Close")
+points(train_df$Close[l_pts_train] ~ train_df$Real_GDP[l_pts_train], col="red", pch=19)
+# Testing Set
+plot(test_df$Close ~ test_df$Volume, main="Volume vs Close", xlab="Volume", ylab="Close")
+points(test_df$Close[l_pts_test] ~ test_df$Volume[l_pts_test], col="red", pch=19)
+plot(test_df$Close ~ test_df$CPI_Common, main="CPI Common vs Close", xlab="CPI Common", ylab="Close")
+points(test_df$Close[l_pts_test] ~ test_df$CPI_Common[l_pts_test], col="red", pch=19)
+plot(test_df$Close ~ test_df$Real_GDP, main="Real GDP vs Close", xlab="Real GDP", ylab="Close")
+points(test_df$Close[l_pts_test] ~ test_df$Real_GDP[l_pts_test], col="red", pch=19)
+mtext("Leverage Points", outer=TRUE, cex=1.2)
+
+# Outliers
+train_r <- rstandard(final_mod)
+outliers_train <- which(train_r < -4 | train_r > 4)
+test_r <- rstandard(test_mod)
+outliers_test <- which(test_r < -4 | test_r > 4)
+# Plot in graph
+# Training Set
+plot(train_df$Close ~ train_df$Volume, main="Volume vs Close", xlab="Volume", ylab="Close")
+points(train_df$Close[outliers_train] ~ train_df$Volume[outliers_train], col="blue", pch=19)
+plot(train_df$Close ~ train_df$CPI_Common, main="CPI Common vs Close", xlab="CPI Common", ylab="Close")
+points(train_df$Close[outliers_train] ~ train_df$CPI_Common[outliers_train], col="blue", pch=19)
+plot(train_df$Close ~ train_df$Real_GDP, main="Real GDP vs Close", xlab="Real GDP", ylab="Close")
+points(train_df$Close[outliers_train] ~ train_df$Real_GDP[outliers_train], col="blue", pch=19)
+# Testing Set
+plot(test_df$Close ~ test_df$Volume, main="Volume vs Close", xlab="Volume", ylab="Close")
+points(test_df$Close[outliers_test] ~ test_df$Volume[outliers_test], col="blue", pch=19)
+plot(test_df$Close ~ test_df$CPI_Common, main="CPI Common vs Close", xlab="CPI Common", ylab="Close")
+points(test_df$Close[outliers_test] ~ test_df$CPI_Common[outliers_test], col="blue", pch=19)
+plot(test_df$Close ~ test_df$Real_GDP, main="Real GDP vs Close", xlab="Real GDP", ylab="Close")
+points(test_df$Close[outliers_test] ~ test_df$Real_GDP[outliers_test], col="blue", pch=19)
+mtext("Outliers", outer=TRUE, cex=1.2)
+
+# Influential Points
+# Find the cooks distance and compare to cutoff
+DCutOff_Train <- qf(0.5, length(coef(final_mod)) - 1, nrow(train_df) - length(coef(final_mod)) - 2)
+D_pts <- which(cooks.distance(final_mod) > DCutOff_Train)
+DCutOff_Test <- qf(0.5, length(coef(test_mod)) - 1, nrow(test_df) - length(coef(test_mod)) - 2)
+D_pts_test <- which(cooks.distance(test_mod) > DCutOff_Test)
+# Find DEFFITS and compare to cutoff
+DFFITSCutOff <- 2 * sqrt((length(coef(final_mod)) - 1)/nrow(train_df))
+DFFITS_pts <- which(abs(dffits(final_mod)) > DFFITSCutOff)
+DFFITSCutOff_Test <- 2 * sqrt((length(coef(test_mod)) - 1)/nrow(test_df))
+DFFITS_pts_test <- which(abs(dffits(test_mod)) > DFFITSCutOff_Test)
+# Find DFBETAS and compare to cutoff
+DFBETACutOff <- 2 / sqrt(nrow(train_df))
+dfb_Intercept <- which(abs(dfbetas(final_mod)[,1]) > DFBETACutOff)
+dfb_Volume <- which(abs(dfbetas(final_mod)[,2]) > DFBETACutOff)
+dfb_CPI_Common <- which(abs(dfbetas(final_mod)[,3]) > DFBETACutOff)
+dfb_Real_GDP <- which(abs(dfbetas(final_mod)[,4]) > DFBETACutOff)
+
+DFBETACutOff_Test <- 2 / sqrt(nrow(test_df))
+dfb_Intercept_test <- which(abs(dfbetas(test_mod)[,1]) > DFBETACutOff_Test)
+dfb_Volume_test <- which(abs(dfbetas(test_mod)[,2]) > DFBETACutOff_Test)
+dfb_CPI_Common_test <- which(abs(dfbetas(test_mod)[,3]) > DFBETACutOff_Test)
+dfb_Real_GDP_test <- which(abs(dfbetas(test_mod)[,4]) > DFBETACutOff_Test)
+# Get the unique points
+dfb_pts <- unique(c(dfb_CPI_Common, dfb_Intercept, dfb_Real_GDP, dfb_Intercept))
+influential_pts <- unique(dfb_pts, D_pts)
+
+dfb_pts_test <- unique(c(dfb_CPI_Common_test, dfb_Intercept_test, dfb_Real_GDP_test, dfb_Intercept_test))
+influential_pts_test <- unique(dfb_pts_test, D_pts_test)
+
+# Plot in graph
+# Training Set
+plot(train_df$Close ~ train_df$Volume, main="Volume vs Close", xlab="Volume", ylab="Close")
+points(train_df$Close[influential_pts] ~ train_df$Volume[influential_pts], col="orange", pch=19)
+plot(train_df$Close ~ train_df$CPI_Common, main="CPI Common vs Close", xlab="CPI Common", ylab="Close")
+points(train_df$Close[influential_pts] ~ train_df$CPI_Common[influential_pts], col="orange", pch=19)
+plot(train_df$Close ~ train_df$Real_GDP, main="Real GDP vs Close", xlab="Real GDP", ylab="Close")
+points(train_df$Close[influential_pts] ~ train_df$Real_GDP[influential_pts], col="orange", pch=19)
+# Testing Set
+plot(test_df$Close ~ test_df$Volume, main="Volume vs Close", xlab="Volume", ylab="Close")
+points(test_df$Close[influential_pts_test] ~ test_df$Volume[influential_pts_test], col="orange", pch=19)
+plot(test_df$Close ~ test_df$CPI_Common, main="CPI Common vs Close", xlab="CPI Common", ylab="Close")
+points(test_df$Close[influential_pts_test] ~ test_df$CPI_Common[influential_pts_test], col="orange", pch=19)
+plot(test_df$Close ~ test_df$Real_GDP, main="Real GDP vs Close", xlab="Real GDP", ylab="Close")
+points(test_df$Close[influential_pts_test] ~ test_df$Real_GDP[influential_pts_test], col="orange", pch=19)
+mtext("Influential Points", outer=TRUE, cex=1.2)
+```
+
+Relatively same amount of influential/leverage points and outliers :)
+
+### Model Violations
+
+```{r, fig.height=5.5, fig.width=14}
+# Condition 1
+par(mfrow=c(1,2))
+# Training Set
+plot(train_df$Close ~ fitted(final_mod), main="Y versus Y-hat", xlab="Y-hat", ylab="Y")
+abline(a=0, b=1)
+lines(lowess(train_df$Close ~ fitted(final_mod)), lty=2)
+# Testing Set
+plot(test_df$Close ~ fitted(test_mod), main="Y versus Y-hat", xlab="Y-hat", ylab="Y")
+abline(a=0, b=1)
+lines(lowess(test_df$Close ~ fitted(test_mod)), lty=2)
+```
+
+```{r, fig.height=5.5, fig.width=7}
+# Condition 2
+pairs(train_df[, c(2, 4, 7)], lower.panel=NULL)
+pairs(test_df[, c(2, 4, 7)], lower.panel=NULL)
+```
+
+### Residual Plots
+```{r, fig.height=13.75, fig.width=7}
+# Get the residuals from spec 1
+final_r <- rstandard(final_mod)
+test_r <- rstandard(test_mod)
+# Plot the residual plots
+par(mfrow=c(5,2))
+# Residual plot for the fitted values
+plot(final_r ~ fitted(final_mod), xlab="Fitted Values", ylab="Residual", main="Fitted Values vs Residual for Training Set")
+abline(a = 0, b = 0)
+plot(test_r ~ fitted(test_mod), xlab="Fitted Values", ylab="Residual", main="Fitted Values vs Residual for Testing Set")
+abline(a = 0, b = 0)
+# Residual plots for the predictors
+for (i in c(2,4,7)) {
+  plot(final_r ~ train_df[, i], xlab=gsub("_", " ", colnames(train_df)[i]), ylab="Residual", main=paste(gsub("_", " ", colnames(train_df)[i]), "vs Residual in Training Set"))
+  abline(a = 0, b = 0)
+  plot(test_r ~ test_df[, i], xlab=gsub("_", " ", colnames(test_df)[i]), ylab="Residual", main=paste(gsub("_", " ", colnames(test_df)[i]), "vs Residual in Testing Set"))
+  abline(a = 0, b = 0)
+}
+
+# Plot the qq plots
+qqnorm(final_r)
+qqline(final_r)
+qqnorm(test_r)
+qqline(test_r)
+```
+
+### EDAs
+```{r, fig.width=7, fig.height=5.5}
+par(mfrow=c(2,2))
+for (i in c(1,2,4,7)) {
+  hist(
+    train_df[,i],
+    main=paste("Histogram of", gsub("_", " ", names(train_df)[i]), "in Training Set"),
+    xlab=gsub("_", " ", names(train_df)[i])
+    )
+  hist(
+    test_df[,i],
+    main=paste("Histogram of", gsub("_", " ", names(test_df)[i]), "in Testing Set"),
+    xlab=gsub("_", " ", names(test_df)[i])
+    )
+}
+```
+
+```{r, fig.width=7, fig.height=8.25}
+# Plot scatterplots against Close
+par(mfrow=c(3,2))
+for (i in c(2,4,7)) {
+  plot(
+    train_df[,i],
+    train_df$Close,
+    main=paste(gsub("_", " ", names(train_df)[i]), "vs", "Close", "in Training Set"),
+    xlab=gsub("_", " ", names(train_df)[i]),
+    ylab="Close"
+    )
+  plot(
+    test_df[,i],
+    test_df$Close,
+    main=paste(gsub("_", " ", names(test_df)[i]), "vs", "Close", "in Testing Set"),
+    xlab=gsub("_", " ", names(test_df)[i]),
+    ylab="Close"
+    )
+}
+```
+
+EDAs all good reasonable :)
+
+### Model Coefficients
+```{r}
+summary(final_mod)
+summary(test_mod)
+```
 
 
-
-
-
-
-
-
-
-
+The huge discrepencies may be due to the fact that the standard deviations for Volume and Real GDP varies greatly between the two sets of data. For volume, the difference is roughly 1 billion shares; for real GDP, it the difference in standard deviation is roughly 10 billion US dollars. So we are unable to verify our model due to the huge discrepancies between the variations in our samples.
 
