@@ -78,30 +78,36 @@ Variable | mean (s.d.) in Training Set | mean (s.d.) in Testing Set
 ***Inflation data provided by the Bank of Canada looks suspiciously good, hmm***
 
 ### EDA On Training Set
-```{r, fig.width=7, fig.height=5.5}
+```{r, fig.width=10.5, fig.height=8.25}
 # Plot Histograms
-par(mfrow=c(2,2))
+par(mfrow=c(3,3))
 for (i in 1:length(train_df)) {
   hist(
     train_df[,i],
     main=paste("Histogram of", gsub("_", " ", names(train_df)[i])),
-    xlab=gsub("_", " ", names(train_df)[i])
+    xlab=gsub("_", " ", names(train_df)[i]),
+    cex.lab=2,
+    cex.axis=2,
+    cex.main=2
     )
 }
 ```
 
 There does appear some skews in the histograms of CPI Common and Real GDP. We will need to watch out for this in our analysis.
 
-```{r, fig.width=7, fig.height=5.5}
+```{r, fig.width=10.5, fig.height=5.5}
 # Plot scatterplots against Close
-par(mfrow=c(2,2))
+par(mfrow=c(2,3), oma=c(1,1,1,1))
 for (i in 2:(length(train_df))) {
   plot(
     train_df[,i],
     train_df$Close,
     main=paste(gsub("_", " ", names(train_df)[i]), "vs", "Close"),
     xlab=gsub("_", " ", names(train_df)[i]),
-    ylab="Close"
+    ylab="Close",
+    cex.lab=2,
+    cex.axis=2,
+    cex.main=2
     )
 }
 ```
@@ -117,12 +123,12 @@ summary(s1)
 #### Checking Conditions 1 and 2
 ```{r, fig.height=5.5, fig.width=7}
 # Condition 1
-plot(train_df$Close ~ fitted(s1), main="Y versus Y-hat", xlab="Y-hat", ylab="Y")
+plot(train_df$Close ~ fitted(s1), main="Y versus Y-hat", xlab="Y-hat", ylab="Y", cex.main=2, cex.lab=2, cex.axis=2)
 abline(a=0, b=1)
 lines(lowess(train_df$Close ~ fitted(s1)), lty=2)
 
 # Condition 2
-pairs(train_df[, c(2:length(train_df))], lower.panel=NULL)
+pairs(train_df[, c(2:length(train_df))], lower.panel=NULL, cex.main=1.6, cex.lab=2, cex.axis=1.6)
 ```
 
 Condition 1 looks amazing. Condition 2 also appear to be okay. We will continue to look at the residual plots.
@@ -247,24 +253,24 @@ pairs(train_df[, c(2, 4:7)], lower.panel=NULL)
 ```
 
 Plot residual plots and normal QQ plots
-```{r, fig.height=5.5, fig.width=7}
+```{r, fig.height=5.5, fig.width=14}
 # Get the residuals from spec 1
 reduced_r <- rstandard(reduced_mod)
 
 # Plot the residual plots
-par(mfrow=c(2,2))
+par(mfrow=c(2,4))
 # Residual plot for the fitted values
-plot(reduced_r ~ fitted(reduced_mod), xlab="Fitted Values", ylab="Residual")
+plot(reduced_r ~ fitted(reduced_mod), xlab="Fitted Values", ylab="Residual", cex.main=2, cex.lab=2, cex.axis=2)
 abline(a = 0, b = 0)
 # Residual plots for the predictors
 for (i in 2:(length(train_df))) {
-  plot(r2 ~ train_df[, i], xlab=gsub("_", " ", colnames(train_df)[i]), ylab="Residual")
+  plot(r2 ~ train_df[, i], xlab=gsub("_", " ", colnames(train_df)[i]), ylab="Residual", cex.main=2, cex.lab=2, cex.axis=2)
   abline(a = 0, b = 0)
 }
 
 # Plot the qq plots
-qqnorm(reduced_r)
-qqline(reduced_r)
+qqnorm(reduced_r, cex.main=2, cex.lab=2, cex.axis=2)
+qqline(reduced_r, cex.main=2, cex.lab=2, cex.axis=2)
 ```
 
 All looks good (excluding slight heteroskedasticity discussed earlier) :)
@@ -327,7 +333,7 @@ library(leaps)
 
 best <- regsubsets(Close ~ ., data=train_df, nbest=1)
 summary(best)
-subsets(best, statistic = "adjr2")
+# subsets(best, statistic = "adjr2")
 ```
 The adjusted R-Squared suggest that we implement the full model, which we have already determined that it's not ideal. So we will ignore its suggestion.
 
@@ -426,9 +432,9 @@ Everything looks good :)
 ### Leverage/Influential Points and Outliers
 
 Compare outliers, influential/leverage points
-```{r, fig.height=5, fig.width=8}
+```{r, fig.height=15, fig.width=8}
 # For Training Model
-par(mfrow=c(2,3), oma=c(0,0,3,0))
+par(mfrow=c(6,3), oma=c(0,0,3,0))
 # Leverage Points
 l_pts_train <- which(hatvalues(final_mod) > 2 * (length(coef(final_mod))-1 + 1) / nrow(train_df))
 l_pts_test <- which(hatvalues(test_mod) > 2 * (length(coef(test_mod))-1 + 1) / nrow(test_df))
@@ -447,7 +453,7 @@ plot(test_df$Close ~ test_df$CPI_Common, main="CPI Common vs Close", xlab="CPI C
 points(test_df$Close[l_pts_test] ~ test_df$CPI_Common[l_pts_test], col="red", pch=19)
 plot(test_df$Close ~ test_df$Real_GDP, main="Real GDP vs Close", xlab="Real GDP", ylab="Close")
 points(test_df$Close[l_pts_test] ~ test_df$Real_GDP[l_pts_test], col="red", pch=19)
-mtext("Leverage Points", outer=TRUE, cex=1.2)
+# mtext("Leverage Points", outer=TRUE, cex=1.2)
 
 # Outliers
 train_r <- rstandard(final_mod)
@@ -469,7 +475,7 @@ plot(test_df$Close ~ test_df$CPI_Common, main="CPI Common vs Close", xlab="CPI C
 points(test_df$Close[outliers_test] ~ test_df$CPI_Common[outliers_test], col="blue", pch=19)
 plot(test_df$Close ~ test_df$Real_GDP, main="Real GDP vs Close", xlab="Real GDP", ylab="Close")
 points(test_df$Close[outliers_test] ~ test_df$Real_GDP[outliers_test], col="blue", pch=19)
-mtext("Outliers", outer=TRUE, cex=1.2)
+# mtext("Outliers", outer=TRUE, cex=1.2)
 
 # Influential Points
 # Find the cooks distance and compare to cutoff
@@ -516,7 +522,7 @@ plot(test_df$Close ~ test_df$CPI_Common, main="CPI Common vs Close", xlab="CPI C
 points(test_df$Close[influential_pts_test] ~ test_df$CPI_Common[influential_pts_test], col="orange", pch=19)
 plot(test_df$Close ~ test_df$Real_GDP, main="Real GDP vs Close", xlab="Real GDP", ylab="Close")
 points(test_df$Close[influential_pts_test] ~ test_df$Real_GDP[influential_pts_test], col="orange", pch=19)
-mtext("Influential Points", outer=TRUE, cex=1.2)
+# mtext("Influential Points", outer=TRUE, cex=1.2)
 ```
 
 Relatively same amount of influential/leverage points and outliers :)
@@ -615,6 +621,12 @@ summary(final_mod)
 summary(test_mod)
 ```
 
+Predictor | Significance In Training Set | Significance In Testing Set
+----------|------------------------------|----------------------------
+Intercept | *** | ***
+Volume | ** | " "
+CPI_Common | *** | " "
+Real_GDP | *** | " "
 
 The huge discrepencies may be due to the fact that the standard deviations for Volume and Real GDP varies greatly between the two sets of data. For volume, the difference is roughly 1 billion shares; for real GDP, it the difference in standard deviation is roughly 10 billion US dollars. So we are unable to verify our model due to the huge discrepancies between the variations in our samples.
 
